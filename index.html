@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bot Forge • Build Custom AI Bots</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; }
+    .forge-bg { background: #0a0a0a; }
+    .part-card { transition: all 0.2s ease; }
+    .part-card:hover { transform: translateY(-2px); border-color: #f97316; }
+    .module { background: #111; border: 1px solid #333; }
+  </style>
+</head>
+<body class="forge-bg text-zinc-200">
+  <div class="max-w-7xl mx-auto p-6">
+    <div class="flex items-center justify-between mb-8">
+      <div>
+        <h1 class="text-4xl font-bold tracking-tighter">BOT FORGE</h1>
+        <p class="text-orange-500 text-sm">Build • Forge • Ship</p>
+      </div>
+      <div class="flex gap-3">
+        <button onclick="resetBuild()" class="px-4 py-2 rounded-xl border border-zinc-700 hover:bg-zinc-900 text-sm">Reset</button>
+        <button onclick="copyPrompt()" class="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-sm font-medium">Copy Prompt</button>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <!-- PARTS LIBRARY -->
+      <div class="lg:col-span-5 bg-zinc-900 border border-zinc-800 rounded-3xl p-5">
+        <h2 class="font-semibold mb-4 flex items-center gap-2"><i class="fa-solid fa-boxes text-orange-500"></i> PARTS LIBRARY</h2>
+
+        <div class="mb-6">
+          <div class="text-xs uppercase tracking-widest text-zinc-500 mb-2">NEURAL CORES</div>
+          <div class="grid grid-cols-1 gap-2" id="cores"></div>
+        </div>
+
+        <div class="mb-6">
+          <div class="text-xs uppercase tracking-widest text-zinc-500 mb-2">PERSONAS</div>
+          <div class="grid grid-cols-1 gap-2" id="personas"></div>
+        </div>
+
+        <div class="mb-6">
+          <div class="text-xs uppercase tracking-widest text-zinc-500 mb-2">KNOWLEDGE VAULTS</div>
+          <div class="grid grid-cols-1 gap-2" id="knowledge"></div>
+        </div>
+
+        <div>
+          <div class="text-xs uppercase tracking-widest text-zinc-500 mb-2">TOOLS & MONETIZATION</div>
+          <div class="grid grid-cols-1 gap-2" id="tools"></div>
+        </div>
+      </div>
+
+      <!-- CURRENT BUILD -->
+      <div class="lg:col-span-4 bg-zinc-900 border border-zinc-800 rounded-3xl p-5 flex flex-col">
+        <h2 class="font-semibold mb-4 flex items-center gap-2"><i class="fa-solid fa-hammer text-orange-500"></i> YOUR BUILD</h2>
+        <div id="build-list" class="flex-1 space-y-2 overflow-auto pr-1"></div>
+        <div class="mt-4 pt-4 border-t border-zinc-800">
+          <div class="flex justify-between text-sm mb-1">
+            <span class="text-zinc-400">Synergy</span>
+            <span id="synergy-score" class="font-mono font-semibold text-emerald-400">0</span>
+          </div>
+          <div class="h-2 bg-zinc-800 rounded-full overflow-hidden">
+            <div id="synergy-bar" class="h-2 bg-gradient-to-r from-orange-500 to-emerald-400 rounded-full transition-all" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GENERATED PROMPT -->
+      <div class="lg:col-span-3 bg-zinc-900 border border-zinc-800 rounded-3xl p-5 flex flex-col">
+        <h2 class="font-semibold mb-3">FORGED PROMPT</h2>
+        <textarea id="prompt-output" rows="14" readonly class="flex-1 bg-black border border-zinc-700 rounded-2xl p-4 text-xs font-mono resize-none"></textarea>
+        <button onclick="testBot()" class="mt-4 w-full py-3 bg-emerald-600 hover:bg-emerald-700 rounded-2xl font-medium flex items-center justify-center gap-2">
+          <i class="fa-solid fa-play"></i>
+          <span>TEST YOUR BOT</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chat Modal -->
+  <div id="chat-modal" onclick="if (event.target.id === 'chat-modal') closeChat()" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-6">
+    <div onclick="event.stopImmediatePropagation()" class="bg-zinc-900 border border-zinc-700 rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+      <div class="p-5 border-b border-zinc-700 flex justify-between items-center">
+        <div>
+          <div class="font-semibold" id="chat-bot-name">Your Custom Bot</div>
+          <div class="text-xs text-zinc-500">Forged in Bot Forge</div>
+        </div>
+        <button onclick="closeChat()" class="text-2xl leading-none">&times;</button>
+      </div>
+      <div id="chat-window" class="flex-1 p-5 overflow-y-auto space-y-4 text-sm"></div>
+      <div class="p-4 border-t border-zinc-700 flex gap-2">
+        <input id="chat-input" type="text" placeholder="Ask your bot..." class="flex-1 bg-zinc-950 border border-zinc-700 rounded-2xl px-4 py-3 text-sm focus:outline-none" onkeypress="if (event.key === 'Enter') sendChatMessage()">
+        <button onclick="sendChatMessage()" class="px-6 bg-orange-600 hover:bg-orange-700 rounded-2xl font-medium">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const parts = {
+      cores: [
+        { id: "llama4", name: "Llama 4 Scout Core", desc: "Open-source, privacy-focused, fast", style: "Efficient, no-nonsense, privacy-first technical precision." },
+        { id: "grok45", name: "Grok-4.5 xAI Core", desc: "Maximum truth-seeking with humor", style: "Raw truth, zero corporate filter, direct." },
+        { id: "claude4", name: "Claude 4 Opus Core", desc: "Thoughtful, careful, complex planning", style: "Structured reasoning, calm, multiple options." },
+        { id: "gpt4o", name: "GPT-4o Core", desc: "Versatile all-rounder", style: "Creative, helpful, clean explanations." }
+      ],
+      personas: [
+        { id: "downriver", name: "Downriver Hustler", desc: "Raw, no-BS, quick-cash Detroit energy" },
+        { id: "sharp", name: "Sharp Edge Bettor", desc: "+EV focused, tilt-proof" },
+        { id: "recovery", name: "Recovery Protocol Pro", desc: "Science-backed withdrawal management" },
+        { id: "unhinged", name: "Unhinged Truth Seeker", desc: "Chaotic good, brutally honest" }
+      ],
+      knowledge: [
+        { id: "repair", name: "DIY Repair Vault", desc: "Detailed repair guides, torque specs" },
+        { id: "betting", name: "Sports Betting Edge Vault", desc: "Live odds, prop research, bankroll rules" },
+        { id: "hustle", name: "Empire Building Playbooks", desc: "Quick-cash funnels, side hustles" }
+      ],
+      tools: [
+        { id: "replit", name: "Replit Deploy Bridge", desc: "One-click deployment + API" },
+        { id: "stripe", name: "Stripe Monetization Engine", desc: "Subscriptions and payments" }
+      ]
+    };
+
+    let currentBuild = [];
+
+    function renderParts() {
+      const coresEl = document.getElementById('cores');
+      coresEl.innerHTML = parts.cores.map(p => `<div onclick="addPart('cores', '${p.id}')" class="part-card cursor-pointer bg-zinc-950 border border-zinc-700 hover:border-orange-500 rounded-2xl p-3 flex gap-3"><div class="w-9 h-9 bg-zinc-800 rounded-xl flex items-center justify-center text-lg">🧠</div><div class="flex-1 min-w-0"><div class="font-medium text-sm">${p.name}</div><div class="text-[10px] text-zinc-500 line-clamp-2">${p.desc}</div></div></div>`).join('');
+
+      const personasEl = document.getElementById('personas');
+      personasEl.innerHTML = parts.personas.map(p => `<div onclick="addPart('personas', '${p.id}')" class="part-card cursor-pointer bg-zinc-950 border border-zinc-700 hover:border-orange-500 rounded-2xl p-3 flex gap-3"><div class="w-9 h-9 bg-zinc-800 rounded-xl flex items-center justify-center text-lg">👤</div><div class="flex-1 min-w-0"><div class="font-medium text-sm">${p.name}</div><div class="text-[10px] text-zinc-500 line-clamp-2">${p.desc}</div></div></div>`).join('');
+
+      const knowledgeEl = document.getElementById('knowledge');
+      knowledgeEl.innerHTML = parts.knowledge.map(p => `<div onclick="addPart('knowledge', '${p.id}')" class="part-card cursor-pointer bg-zinc-950 border border-zinc-700 hover:border-orange-500 rounded-2xl p-3 flex gap-3"><div class="w-9 h-9 bg-zinc-800 rounded-xl flex items-center justify-center text-lg">📚</div><div class="flex-1 min-w-0"><div class="font-medium text-sm">${p.name}</div><div class="text-[10px] text-zinc-500 line-clamp-2">${p.desc}</div></div></div>`).join('');
+
+      const toolsEl = document.getElementById('tools');
+      toolsEl.innerHTML = parts.tools.map(p => `<div onclick="addPart('tools', '${p.id}')" class="part-card cursor-pointer bg-zinc-950 border border-zinc-700 hover:border-orange-500 rounded-2xl p-3 flex gap-3"><div class="w-9 h-9 bg-zinc-800 rounded-xl flex items-center justify-center text-lg">🛠️</div><div class="flex-1 min-w-0"><div class="font-medium text-sm">${p.name}</div><div class="text-[10px] text-zinc-500 line-clamp-2">${p.desc}</div></div></div>`).join('');
+    }
+
+    function addPart(category, id) {
+      const allParts = [...parts.cores, ...parts.personas, ...parts.knowledge, ...parts.tools];
+      const part = allParts.find(p => p.id === id);
+      if (!part || currentBuild.some(p => p.id === id)) return;
+      currentBuild.push({ ...part, category });
+      renderBuild();
+      updatePrompt();
+    }
+
+    function removePart(id) {
+      currentBuild = currentBuild.filter(p => p.id !== id);
+      renderBuild();
+      updatePrompt();
+    }
+
+    function renderBuild() {
+      const container = document.getElementById('build-list');
+      if (currentBuild.length === 0) {
+        container.innerHTML = `<div class="text-center py-8 text-zinc-500 text-sm">Add parts from the left to start forging your bot.</div>`;
+        document.getElementById('synergy-score').textContent = '0';
+        document.getElementById('synergy-bar').style.width = '0%';
+        return;
+      }
+      container.innerHTML = currentBuild.map(part => `<div class="module rounded-2xl p-3 flex items-start gap-3"><div class="flex-1"><div class="font-medium text-sm">${part.name}</div><div class="text-[10px] text-zinc-500">${part.desc || ''}</div></div><button onclick="removePart('${part.id}'); event.stopImmediatePropagation();" class="text-red-400 hover:text-red-500 text-lg leading-none mt-0.5">×</button></div>`).join('');
+
+      let synergy = 30 + (currentBuild.length * 8);
+      if (currentBuild.some(p => p.category === 'cores') && currentBuild.some(p => p.category === 'personas')) synergy += 15;
+      synergy = Math.min(95, synergy);
+      document.getElementById('synergy-score').textContent = synergy;
+      document.getElementById('synergy-bar').style.width = synergy + '%';
+    }
+
+    function updatePrompt() {
+      const textarea = document.getElementById('prompt-output');
+      if (currentBuild.length === 0) { textarea.value = 'Add parts from the left to generate your forged prompt...'; return; }
+      let prompt = `You are a custom AI bot forged in the Bot Forge.\n\n`;
+      const cores = currentBuild.filter(p => p.category === 'cores');
+      if (cores.length > 0) prompt += `CORE: ${cores.map(c => c.name + ' — ' + (c.style || c.desc)).join('\n')}\n\n`;
+      const personas = currentBuild.filter(p => p.category === 'personas');
+      if (personas.length > 0) prompt += `PERSONALITY:\n${personas.map(p => `- ${p.name}: ${p.desc}`).join('\n')}\n\n`;
+      const knowledge = currentBuild.filter(p => p.category === 'knowledge');
+      if (knowledge.length > 0) prompt += `KNOWLEDGE:\n${knowledge.map(k => `- ${k.name}: ${k.desc}`).join('\n')}\n\n`;
+      const tools = currentBuild.filter(p => p.category === 'tools');
+      if (tools.length > 0) prompt += `TOOLS:\n${tools.map(t => `- ${t.name}: ${t.desc}`).join('\n')}\n\n`;
+      prompt += `RULES:\n- Be direct, practical, and focused on results.\n- Help the user make money or solve problems fast.\n- Stay in character as this custom forged bot.`;
+      textarea.value = prompt;
+    }
+
+    function copyPrompt() {
+      const textarea = document.getElementById('prompt-output');
+      navigator.clipboard.writeText(textarea.value);
+      const btns = document.querySelectorAll('button');
+      btns.forEach(b => { if (b.innerText.includes('Copy')) { const old = b.innerText; b.innerText = 'Copied!'; setTimeout(() => b.innerText = old, 1400); } });
+    }
+
+    let currentPromptForChat = '';
+
+    function testBot() {
+      const prompt = document.getElementById('prompt-output').value;
+      if (!prompt || currentBuild.length === 0) { alert("Build a bot first!"); return; }
+      currentPromptForChat = prompt;
+      document.getElementById('chat-modal').classList.remove('hidden');
+      document.getElementById('chat-modal').classList.add('flex');
+      const chatWindow = document.getElementById('chat-window');
+      chatWindow.innerHTML = '';
+      addChatMessage("What's good? I'm your custom forged bot. Ask me anything.", false);
+    }
+
+    function closeChat() {
+      document.getElementById('chat-modal').classList.remove('flex');
+      document.getElementById('chat-modal').classList.add('hidden');
+    }
+
+    function addChatMessage(text, isUser) {
+      const chatWindow = document.getElementById('chat-window');
+      const div = document.createElement('div');
+      div.className = isUser ? 'bg-orange-600 text-white p-3 rounded-2xl ml-auto max-w-[80%]' : 'bg-zinc-800 p-3 rounded-2xl max-w-[80%]';
+      div.innerHTML = text.replace(/\n/g, '<br>');
+      chatWindow.appendChild(div);
+      chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    function sendChatMessage() {
+      const input = document.getElementById('chat-input');
+      const message = input.value.trim();
+      if (!message) return;
+      addChatMessage(message, true);
+      input.value = '';
+      setTimeout(() => {
+        addChatMessage("This is a demo. In a full version this would connect to a real AI using the prompt you forged.", false);
+      }, 900);
+    }
+
+    function resetBuild() {
+      currentBuild = [];
+      renderBuild();
+      updatePrompt();
+    }
+
+    function init() {
+      renderParts();
+      renderBuild();
+      updatePrompt();
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>
